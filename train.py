@@ -33,7 +33,7 @@ parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='disables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
-parser.add_argument('--epochs', type=int, default=300, metavar='N',
+parser.add_argument('--epochs', type=int, default=600, metavar='N',
                     help='number of epochs to train (default: 300)')
 parser.add_argument('--batchsize', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 64)')
@@ -51,8 +51,11 @@ torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
-PATH_TO_TRAIN_IMAGES = os.path.join('data', 'processed32', 'processed_train_images')
+PATH_TO_TRAIN_IMAGES = os.path.join('data', 'processed32', 'train_images')
 PATH_TO_TRAIN_DATA = os.path.join('data', 'given', 'train_master.tsv')
+
+PATH_TO_TEST_IMAGES = os.path.join('data', 'processed32', 'test_images')
+PATH_TO_TEST_DATA = os.path.join('data', 'given', 'test_master.tsv')
 PATH_TO_MODEL = os.path.join('models', args.nettype)
 
 category_num=24
@@ -86,8 +89,11 @@ elif args.nettype=='easynn2':
 elif args.nettype=='resnet18':
     criterion = nn.CrossEntropyLoss()
 
-def load_train_data(path_to_train_images, path_to_train_data):
-    print('loading train data ...')
+def load_data(path_to_train_images, path_to_train_data,op):
+    if op=='train':
+        print('loading train data ...')
+    elif op=='test':
+        print('loading test data ...')
     data = pd.read_csv(path_to_train_data, sep='\t')
     X = []
     y = []
@@ -156,13 +162,50 @@ def train(epoch,X,y):
 
     print(colored("right: %d  ! " %right,'red'))
 
+def test(epoch,X,y):
+    model.eval()
+    print(colored('Testing!','blue'))
 
+    tot_loss=0.0
+    num=0
+    right=0
+    
+    for i in tqdm(range(1,X.shape[0]-args.batchsize+2,args.batchsize)):
+        inputs=(torch.from_numpy(X[i:i+args.batchsize])).float()
+        targets=(torch.from_numpy(y[i:i+args.batchsize]))
+
+        if args.cuda:
+            inputs, targets = inputs.cuda(), targets.cuda()
+        inputs, targets = Variable(inputs), Variable(targets)
+        
+        output = model(inputs)
+        
+        loss = criterion(output, targets)
+
+        tot_loss=tot_loss+loss.data[0]
+        _,indices=torch.max(output.data,1)
+        indices=indices.view(args.batchsize)
+        right=right+sum(indices==targets.data)
+        num=num+1
+        
+    #print(output.data)
+    averageloss=2.3  
+    averageloss=(tot_loss*1.0)/(num*args.batchsize*1.00)
+    print(colored("averageloss: %.4f ! " %averageloss,'red'))
+    precision=2.3
+    precision=(right*100.0)/(num*args.batchsize*1.00)
+
+    print(colored("precision: %.2f%c ! " %(precision,'%'),'red'))
+
+    print(colored("right: %d  ! " %right,'red'))
 
 
 
 if __name__ == '__main__':
     ## load the data for training
-    X, y = load_train_data(PATH_TO_TRAIN_IMAGES, PATH_TO_TRAIN_DATA)
+    X, y = load_data(PATH_TO_TRAIN_IMAGES, PATH_TO_TRAIN_DATA,'train')
+
+    testX, testy=load_data(PATH_TO_TEST_IMAGES, PATH_TO_TEST_DATA,'test')
     
     ## instanciate and train the model
     #model = get_model()
@@ -174,5 +217,6 @@ if __name__ == '__main__':
 
     for epoch in range(1, args.epochs + 1):
         train(epoch,X,y)
+        test(epoch,testX,testy)
         if epoch%5==0:
             save_model(model, PATH_TO_MODEL)

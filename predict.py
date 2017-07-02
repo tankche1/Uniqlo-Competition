@@ -46,7 +46,7 @@ def load_test_data(path_to_test_images):
 
 def load_trained_model(path_to_trained_model):
     print('loading trained model ...')
-    model = torch.load('models/resnet184.t7')
+    model = torch.load('models/easynn21.t7')
     model.cuda()
     print('done.')
     return model
