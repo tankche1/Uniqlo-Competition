@@ -18,14 +18,15 @@ from tqdm import *
 from termcolor import *
 from torch.autograd import Variable
 import torch.nn.functional as F
+import torch.nn as nn
 # from package.models import MyModel # you may import your own model in the package
 # from package import preprocess_methods # you may import your own preprocess method in the package
 
 
 parser=argparse.ArgumentParser(description='uniqlo network')
 
-parser.add_argument('--nettype',default='easynn2',metavar='NT',
-                    help='choose the network')
+parser.add_argument('--nettype',default='resnet18',metavar='NT',
+                    help='choose the network easynn|easynn2|resnet18')
 parser.add_argument('--bh',default='1',
                     help='choose the network')
 parser.add_argument('--no-cuda', action='store_true', default=False,
@@ -36,10 +37,12 @@ parser.add_argument('--epochs', type=int, default=300, metavar='N',
                     help='number of epochs to train (default: 300)')
 parser.add_argument('--batchsize', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 64)')
-parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
+parser.add_argument('--lr', type=float, default=0.1, metavar='LR',
                     help='learning rate (default: 0.001)')
 parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
                     help='SGD momentum (default: 0.9)')
+parser.add_argument('--weight_decay', type=float, default=5e-4,
+                    help='SGD weight_decay (default: 5e-4)')
 
 args=parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -62,6 +65,9 @@ if args.nettype=='easynn':
 elif args.nettype=='easynn2':
     from package.easynn2 import easynn2
     model=easynn2(category_num)
+elif args.nettype=='resnet18':
+    from package.resnet import ResNet18
+    model=ResNet18()
 
 if args.cuda:
     model.cuda()
@@ -71,7 +77,14 @@ print(model)
 
 print(colored('initializing done.',"blue"))
 
-optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
+optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum,weight_decay=args.weight_decay)
+
+if args.nettype=='easynn':
+    criterion=F.nll_loss()
+elif args.nettype=='easynn2':
+    criterion=F.nll_loss()
+elif args.nettype=='resnet18':
+    criterion = nn.CrossEntropyLoss()
 
 def load_train_data(path_to_train_images, path_to_train_data):
     print('loading train data ...')
@@ -116,45 +129,23 @@ def train(epoch,X,y):
         inputs=(torch.from_numpy(X[i:i+args.batchsize])).float()
         targets=(torch.from_numpy(y[i:i+args.batchsize]))
 
-        #print(type(inputs))
         if args.cuda:
             inputs, targets = inputs.cuda(), targets.cuda()
         inputs, targets = Variable(inputs), Variable(targets)
-        #print(inputs.size())
         optimizer.zero_grad()
         output = model(inputs)
         
-        #print(output.data)
-        #print(indices)
-        #print(targets)
-        #print(sum(indices==targets))
-        #print(output.size())
-        loss =F.nll_loss(output, targets)
-
-        tot_loss=tot_loss+sum(loss.data)
-        #print(loss.data)
-        Smax,indices=torch.max(output.data,1)
-        indices=indices.view(args.batchsize)
-        right=right+sum(indices==targets.data)
-
+        loss = criterion(output, targets)
         loss.backward()
         optimizer.step()
+
+        tot_loss=tot_loss+loss.data[0]
+        _,indices=torch.max(output.data,1)
+        indices=indices.view(args.batchsize)
+        right=right+sum(indices==targets.data)
         num=num+1
         
-
-        #print(output.data.size())
-        #print(targets.data.size())
-
-        
-        #print(type(indices))
-        
-        #print(indices,targets)
-        
-        #print(sum(indices==targets.data))
-        #print(type(right))
-    
-    #print(indices,targets.data)
-    print(output.data)
+    #print(output.data)
     averageloss=2.3  
     averageloss=(tot_loss*1.0)/(num*args.batchsize*1.00)
     print(colored("averageloss: %.4f ! " %averageloss,'red'))
