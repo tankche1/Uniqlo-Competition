@@ -9,13 +9,19 @@ import os
 import pandas as pd
 import pickle
 import numpy as np
+import torch
 from PIL import Image
 from collections import OrderedDict
+from tqdm import *
+from termcolor import *
+from torch.autograd import Variable
 # from package import preprocess_methods # if you used some preprocess method in training phase, you may want to apply it in test phase.
 
 PATH_TO_TRAINED_MODEL = os.path.join('models', 'mlp.pkl')
-PATH_TO_TEST_IMAGES = os.path.join('data', 'processed', 'test_images')
+PATH_TO_TEST_IMAGES = os.path.join('data', 'processed32', 'processed_test_images')
 PATH_TO_SUBMIT_FILE = 'submit.csv'
+
+BatchSize=100
 
 def load_test_data(path_to_test_images):
     print('loading test data ...')
@@ -29,7 +35,7 @@ def load_test_data(path_to_test_images):
             # you may write preprocess method here given an image
             # im = preprocess_methods.my_preprocess_method(im)
             
-            X.append(np.array(im).flatten())
+            X.append(np.array(im).transpose(2,0,1))
             file_name.append(f)
         except Exception as e:
             print(str(e))
@@ -40,8 +46,8 @@ def load_test_data(path_to_test_images):
 
 def load_trained_model(path_to_trained_model):
     print('loading trained model ...')
-    with open(path_to_trained_model, mode='rb') as f:
-        model = pickle.load(f)
+    model = torch.load('models/resnet184.t7')
+    model.cuda()
     print('done.')
     return model
 
@@ -49,7 +55,26 @@ def predict(model, X, file_name):
     print('predicting ...')
     dic = OrderedDict()
     dic['file_name'] = file_name
-    dic['prediction'] = model.predict(X)
+    #dic['prediction'] = model.predict(X)
+    predicts=[1]*len(file_name)
+    print(colored(len(file_name),'blue'))
+    for i in tqdm(range(0,len(file_name)-BatchSize+1,BatchSize)):
+        #inputs=X[i:i+BatchSize]
+        inputs=(torch.from_numpy(X[i:i+BatchSize])).float()
+        inputs=inputs.cuda()
+        inputs=Variable(inputs)
+        output=model(inputs)
+
+        _,indices=torch.max(output.data,1)
+        indices=indices.view(BatchSize)
+
+        for j in range(i,i+BatchSize):
+            #print(j)
+            predicts[j]=indices[j-i]
+    
+    predicts[9800]=16
+
+    dic['prediction']=predicts
     print('done.')
     return pd.DataFrame(dic)
 
