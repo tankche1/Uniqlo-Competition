@@ -25,8 +25,8 @@ import torch.nn as nn
 
 parser=argparse.ArgumentParser(description='uniqlo network')
 
-parser.add_argument('--nettype',default='resnet18',metavar='NT',
-                    help='choose the network easynn|easynn2|resnet18')
+parser.add_argument('--nettype',default='myresnet',metavar='NT',
+                    help='choose the network easynn|easynn2|resnet18|myresnet')
 parser.add_argument('--bh',default='1',
                     help='choose the network')
 parser.add_argument('--no-cuda', action='store_true', default=False,
@@ -43,6 +43,8 @@ parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
                     help='SGD momentum (default: 0.9)')
 parser.add_argument('--weight_decay', type=float, default=5e-4,
                     help='SGD weight_decay (default: 5e-4)')
+parser.add_argument('--early_stopping', type=int,default=0,
+                    help='early_stopping')
 
 args=parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -56,9 +58,11 @@ PATH_TO_TRAIN_DATA = os.path.join('data', 'given', 'train_master.tsv')
 
 PATH_TO_TEST_IMAGES = os.path.join('data', 'processed32', 'test_images')
 PATH_TO_TEST_DATA = os.path.join('data', 'given', 'test_master.tsv')
-PATH_TO_MODEL = os.path.join('models', args.nettype)
+PATH_TO_MODEL = os.path.join('models', args.nettype,args.bh)
 
 category_num=24
+history=[0.01]*1000
+historyMax=0.01
 
 print(colored('initializing the model ...',"blue"))
 
@@ -70,6 +74,9 @@ elif args.nettype=='easynn2':
     model=easynn2(category_num)
 elif args.nettype=='resnet18':
     from package.resnet import ResNet18
+    model=ResNet18()
+elif args.nettype=='myresnet':
+    from package.myresnet import ResNet18
     model=ResNet18()
 
 if args.cuda:
@@ -87,6 +94,8 @@ if args.nettype=='easynn':
 elif args.nettype=='easynn2':
     criterion=F.nll_loss()
 elif args.nettype=='resnet18':
+    criterion = nn.CrossEntropyLoss()
+elif args.nettype=='myresnet':
     criterion = nn.CrossEntropyLoss()
 
 def load_data(path_to_train_images, path_to_train_data,op):
@@ -117,8 +126,10 @@ def load_data(path_to_train_images, path_to_train_data,op):
 
 def save_model(model, name):
     print('saving the model ...')
+    if not os.path.exists(PATH_TO_MODEL):
+        os.mkdir(PATH_TO_MODEL)
 
-    torch.save(model,PATH_TO_MODEL+args.bh+'.t7')
+    torch.save(model,PATH_TO_MODEL+'/'+str(historyMax)+'.t7')
     print('done.')
 
 
@@ -199,6 +210,11 @@ def test(epoch,X,y):
 
     print(colored("right: %d  ! " %right,'red'))
 
+    global historyMax
+    global history
+    history[epoch]=precision
+    historyMax=max(historyMax,precision)
+
 
 
 if __name__ == '__main__':
@@ -218,5 +234,14 @@ if __name__ == '__main__':
     for epoch in range(1, args.epochs + 1):
         train(epoch,X,y)
         test(epoch,testX,testy)
-        if epoch%5==0:
+        if historyMax==history[epoch]:
             save_model(model, PATH_TO_MODEL)
+        if args.early_stopping==1:
+            haha=0
+            if(epoch>20):
+                for i in range(epoch-20+1,epoch+1):
+                    if(history[i]==historyMax):
+                        haha=1
+                if haha==0:
+                    break
+

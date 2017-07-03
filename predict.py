@@ -17,9 +17,8 @@ from termcolor import *
 from torch.autograd import Variable
 # from package import preprocess_methods # if you used some preprocess method in training phase, you may want to apply it in test phase.
 
-PATH_TO_TRAINED_MODEL = os.path.join('models', 'mlp.pkl')
 PATH_TO_TEST_IMAGES = os.path.join('data', 'processed32', 'processed_test_images')
-PATH_TO_SUBMIT_FILE = 'submit.csv'
+PATH_TO_SUBMIT_FILE = 'submit77.csv'
 
 BatchSize=100
 
@@ -44,9 +43,9 @@ def load_test_data(path_to_test_images):
     print('done.')
     return X, file_name
 
-def load_trained_model(path_to_trained_model):
+def load_trained_model():
     print('loading trained model ...')
-    model = torch.load('models/easynn21.t7')
+    model = torch.load('models/myresnet7771.410472973.t7')
     model.cuda()
     print('done.')
     return model
@@ -83,7 +82,7 @@ if __name__ == '__main__':
     X, file_name = load_test_data(PATH_TO_TEST_IMAGES)
     
     ## load the trained model
-    model = load_trained_model(PATH_TO_TRAINED_MODEL)
+    model = load_trained_model()
     
     ## output the submit file
     submit = predict(model, X, file_name)
