@@ -15,15 +15,15 @@ from numpy import *
 from tqdm import *
 
 PATH_TO_GIVEN_DATA = os.path.join('data','given')
-PATH_TO_MY_DATA = os.path.join('data','processed32')
+PATH_TO_MY_DATA = os.path.join('data','processed64')
 if not os.path.exists(PATH_TO_MY_DATA):
     os.mkdir(PATH_TO_MY_DATA)
 
 PATH_TO_TRAIN_IMAGES = os.path.join(PATH_TO_MY_DATA, 'train')
 PATH_TO_TEST_IMAGES = os.path.join(PATH_TO_MY_DATA, 'test')
 
-PATH_TO_DST_TRAIN_IMAGES = os.path.join(PATH_TO_MY_DATA, 'processed_train_images')
-PATH_TO_DST_TEST_IMAGES = os.path.join(PATH_TO_MY_DATA, 'processed_test_images')
+PATH_TO_DST_TRAIN_IMAGES = os.path.join(PATH_TO_MY_DATA, 'processed_enlarge_train_images')
+PATH_TO_DST_TEST_IMAGES = os.path.join(PATH_TO_MY_DATA, 'processed_enlarge_test_images')
 if not os.path.exists(PATH_TO_DST_TRAIN_IMAGES):
     os.mkdir(PATH_TO_DST_TRAIN_IMAGES)
 if not os.path.exists(PATH_TO_DST_TEST_IMAGES):
@@ -44,7 +44,8 @@ def preprocess_image(path_to_images, path_to_dst_images):
         # you may write your own preprocess method here
 
         #crop_size = (4,4,24,24)
-        im = im.resize((32,32),Image.ANTIALIAS)
+        im = im.resize((64,64),Image.ANTIALIAS)
+        
         im.save(os.path.join(path_to_dst_images, f))
     
     # if you want to process batch-wise, write the process here
@@ -61,6 +62,8 @@ def lookup(path_to_images):
     print('end lookup!  ')
 
 
+
+
 if __name__ == '__main__':
     ## extract the given zipfiles(or maybe tarfiles)
 
@@ -71,8 +74,8 @@ if __name__ == '__main__':
     
     ##preprocess the data (maybe optional)
     #if not os.path.exists(PATH_TO_DST_TRAIN_IMAGES):
-    preprocess_image(PATH_TO_TRAIN_IMAGES, PATH_TO_DST_TRAIN_IMAGES)
+    #preprocess_image(PATH_TO_TRAIN_IMAGES, PATH_TO_DST_TRAIN_IMAGES)
     #if not os.path.exists(PATH_TO_DST_TEST_IMAGES):
-    preprocess_image(PATH_TO_TEST_IMAGES, PATH_TO_DST_TEST_IMAGES)
+    #preprocess_image(PATH_TO_TEST_IMAGES, PATH_TO_DST_TEST_IMAGES)
 
     #lookup(PATH_TO_DST_TEST_IMAGES)
