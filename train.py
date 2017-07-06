@@ -25,8 +25,8 @@ import torch.nn as nn
 
 parser=argparse.ArgumentParser(description='uniqlo network')
 
-parser.add_argument('--nettype',default='myresnet',metavar='NT',
-                    help='choose the network easynn|easynn2|resnet18|myresnet')
+parser.add_argument('--nettype',default='myresnet2',metavar='NT',
+                    help='choose the network easynn|easynn2|resnet18|myresnet|myresnet2')
 parser.add_argument('--bh',default='1',
                     help='choose the network')
 parser.add_argument('--no-cuda', action='store_true', default=False,
@@ -53,16 +53,17 @@ torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
-PATH_TO_TRAIN_IMAGES = os.path.join('data', 'processed32', 'train_images')
+PATH_TO_TRAIN_IMAGES = os.path.join('data', 'processed64', 'train_images')
 PATH_TO_TRAIN_DATA = os.path.join('data', 'given', 'train_master.tsv')
 
-PATH_TO_TEST_IMAGES = os.path.join('data', 'processed32', 'test_images')
+PATH_TO_TEST_IMAGES = os.path.join('data', 'processed64', 'test_images')
 PATH_TO_TEST_DATA = os.path.join('data', 'given', 'test_master.tsv')
 PATH_TO_MODEL = os.path.join('models', args.nettype,args.bh)
 
 category_num=24
 history=[0.01]*1000
 historyMax=0.01
+group=[0,0,1,1,1,1,2,2,2,3,3,4,4,4,4,4,5,6,6,6,6,7,7,7]
 
 print(colored('initializing the model ...',"blue"))
 
@@ -77,6 +78,9 @@ elif args.nettype=='resnet18':
     model=ResNet18()
 elif args.nettype=='myresnet':
     from package.myresnet import ResNet18
+    model=ResNet18()
+elif args.nettype=='myresnet2':
+    from package.myresnet2 import ResNet18
     model=ResNet18()
 
 if args.cuda:
@@ -97,6 +101,8 @@ elif args.nettype=='resnet18':
     criterion = nn.CrossEntropyLoss()
 elif args.nettype=='myresnet':
     criterion = nn.CrossEntropyLoss()
+elif args.nettype=='myresnet2':
+    criterion = nn.CrossEntropyLoss()
 
 def load_data(path_to_train_images, path_to_train_data,op):
     if op=='train':
@@ -106,6 +112,7 @@ def load_data(path_to_train_images, path_to_train_data,op):
     data = pd.read_csv(path_to_train_data, sep='\t')
     X = []
     y = []
+    z=[]
     for row in tqdm(data.iterrows()):
         f, l = row[1]['file_name'], row[1]['category_id']
         try:
@@ -116,13 +123,15 @@ def load_data(path_to_train_images, path_to_train_data,op):
 
             X.append(np.array(im).transpose(2,0,1))
             y.append(l)
+            z.append(group[l])
         except Exception as e:
             print(str(e))
 
     X = np.array(X)
     y = np.array(y)
+    z = np.array(z)
     print('done.')
-    return X, y
+    return X, y,z
 
 def save_model(model, name):
     print('saving the model ...')
@@ -132,9 +141,17 @@ def save_model(model, name):
     torch.save(model,PATH_TO_MODEL+'/'+str(historyMax)+'.t7')
     print('done.')
 
+def visualize(data):
+    for i in range(0,24):
+        print('color '+str(i)+ '!')
+        for j in range(0,24):
+            if(data[i][j]>5):
+                print('[%d][%d] = %.2f ' %(i,j,data[i][j]) ,)
+        print()
 
 
-def train(epoch,X,y):
+
+def train(epoch,X,y,z):
     model.train()
     print(colored('training epoch '+ str(epoch) + ' !','blue'))
 
@@ -148,32 +165,36 @@ def train(epoch,X,y):
 
         if args.cuda:
             inputs, targets = inputs.cuda(), targets.cuda()
-        inputs, targets = Variable(inputs), Variable(targets)
+            inputs, targets = Variable(inputs), Variable(targets)
+
         optimizer.zero_grad()
         output = model(inputs)
         
-        loss = criterion(output, targets)
+        loss=criterion(output, targets)
+
         loss.backward()
         optimizer.step()
 
         tot_loss=tot_loss+loss.data[0]
+        num=num+1
+
         _,indices=torch.max(output.data,1)
         indices=indices.view(args.batchsize)
         right=right+sum(indices==targets.data)
-        num=num+1
         
     #print(output.data)
     averageloss=2.3  
     averageloss=(tot_loss*1.0)/(num*args.batchsize*1.00)
     print(colored("averageloss: %.4f ! " %averageloss,'red'))
+
     precision=2.3
     precision=(right*100.0)/(num*args.batchsize*1.00)
-
     print(colored("precision: %.2f%c ! " %(precision,'%'),'red'))
 
-    print(colored("right: %d  ! " %right,'red'))
+    #print(colored("right: %d  ! " %right,'red'))
 
-def test(epoch,X,y):
+def test(epoch,X,y,z):
+    Miss=[[0 for col in range(0,24)] for row in range(0,24)]# suppose i to be j
     model.eval()
     print(colored('Testing!','blue'))
 
@@ -187,41 +208,52 @@ def test(epoch,X,y):
 
         if args.cuda:
             inputs, targets = inputs.cuda(), targets.cuda()
-        inputs, targets = Variable(inputs), Variable(targets)
+            inputs, targets = Variable(inputs), Variable(targets)
         
         output = model(inputs)
         
         loss = criterion(output, targets)
-
         tot_loss=tot_loss+loss.data[0]
+        
         _,indices=torch.max(output.data,1)
         indices=indices.view(args.batchsize)
         right=right+sum(indices==targets.data)
+
+        for j in range(0,args.batchsize):
+            Miss[targets.data[j]][indices[j]]+=1
+
         num=num+1
         
     #print(output.data)
     averageloss=2.3  
     averageloss=(tot_loss*1.0)/(num*args.batchsize*1.00)
     print(colored("averageloss: %.4f ! " %averageloss,'red'))
+
     precision=2.3
     precision=(right*100.0)/(num*args.batchsize*1.00)
-
     print(colored("precision: %.2f%c ! " %(precision,'%'),'red'))
 
-    print(colored("right: %d  ! " %right,'red'))
+    #print(colored("right: %d  ! " %right,'red'))
 
     global historyMax
     global history
     history[epoch]=precision
     historyMax=max(historyMax,precision)
 
+    Misspre=np.array([[0.01 for col in range(0,24)] for row in range(0,24)])
+    for i in range(0,24):
+        for j in range(0,24):
+            Misspre[i][j]=(100*Miss[i][j]*1.000)/(sum(Miss[i])*1.000)
+    #torch.save(Misspre,'visualize/visualize.t7')
+    #visualize(Misspre)
+
 
 
 if __name__ == '__main__':
     ## load the data for training
-    X, y = load_data(PATH_TO_TRAIN_IMAGES, PATH_TO_TRAIN_DATA,'train')
+    X, y ,z= load_data(PATH_TO_TRAIN_IMAGES, PATH_TO_TRAIN_DATA,'train')
 
-    testX, testy=load_data(PATH_TO_TEST_IMAGES, PATH_TO_TEST_DATA,'test')
+    testX, testy,testz=load_data(PATH_TO_TEST_IMAGES, PATH_TO_TEST_DATA,'test')
     
     ## instanciate and train the model
     #model = get_model()
@@ -232,8 +264,8 @@ if __name__ == '__main__':
     #print(np.shape(X))
 
     for epoch in range(1, args.epochs + 1):
-        train(epoch,X,y)
-        test(epoch,testX,testy)
+        train(epoch,X,y,z)
+        test(epoch,testX,testy,testz)
         if historyMax==history[epoch]:
             save_model(model, PATH_TO_MODEL)
         if args.early_stopping==1:

@@ -1,10 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Mon Apr 17 11:50:58 2017
-
-@author: n.aoi
-"""
-
 import os
 import pandas as pd
 import numpy as np
@@ -50,7 +44,7 @@ parser.add_argument('--automonous_stopping', type=int,default=0,
                     help='automonous_stopping')
 parser.add_argument('--data',default='data',metavar='NT',
                     help='the data directory')
-parser.add_argument('--modelpos',default='layer3.t7',metavar='NT',
+parser.add_argument('--modelpos',default='models/resnet18_pretrained.t7',metavar='NT',
                     help='the data directory')
 
 args=parser.parse_args()
@@ -60,7 +54,7 @@ torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
-PATH_TO_MODEL = os.path.join('models', 'fine_models',args.bh)
+PATH_TO_MODEL = os.path.join('models', 'color_models')
 
 category_num=24
 history=[0.01]*1000
@@ -68,7 +62,8 @@ historyMax=0.01
 Hloss=[0.01]*1000
 lossMin=1000000.0
 hash2=[0, 1, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 2, 20, 21, 22, 23, 3, 4, 5, 6, 7, 8, 9]
-
+colorMax=[0.0001]*24
+Misspre=np.array([[0.01 for col in range(0,24)] for row in range(0,24)])
 
 # loading pre-trained model
 
@@ -77,7 +72,7 @@ print(colored('load model at '+args.modelpos,"blue"))
 
 #model = models.resnet18(pretrained=True)#at least 224*224
 model=torch.load(args.modelpos)
-#model.fc=nn.Linear(512,24)
+model.fc=nn.Linear(512,24)
 
 for param in model.parameters():
     param.requires_grads=False
@@ -86,6 +81,7 @@ model.fc.requires_grads=True
 model.layer4.requires_grads=True
 model.layer3.requires_grads=True
 model.layer2.requires_grads=True
+model.layer1.requires_grads=True
 
 if args.cuda:
     model.cuda()
@@ -176,6 +172,7 @@ def save_model(model, name):
     torch.save(model,PATH_TO_MODEL+'/'+str(historyMax)+'.t7')
     print('done.')
 
+
 def visualize(data):
     for i in range(0,24):
         print('color '+str(i)+ '!')
@@ -186,6 +183,15 @@ def visualize(data):
     for i in range(0,24):
         print(colored('color %d precision: %.2f !' %(i,data[i][i]),'green'))
 
+def save_color_model(model, color):
+    print('saving the color model for %d ...' %color)
+    visualize(Misspre)
+    PATH_TO_COLOR=PATH_TO_MODEL+str(color)
+    if not os.path.exists(PATH_TO_COLOR):
+        os.mkdir(PATH_TO_COLOR)
+
+    torch.save(model,PATH_TO_COLOR+'/'+str(colorMax[color])+'.t7')
+    print('done.')
 
 def train(epoch):
 
@@ -306,12 +312,17 @@ def test(epoch):
     history[epoch]=precision
     historyMax=max(historyMax,precision)
 
-    Misspre=np.array([[0.01 for col in range(0,24)] for row in range(0,24)])
+    global Misspre
     for i in range(0,24):
         for j in range(0,24):
             Misspre[hash2[i]][hash2[j]]=(100*Miss[hash2[i]][hash2[j]]*1.000)/(sum(Miss[hash2[i]])*1.000)
     #torch.save(Misspre,'visualize/visualize.t7')
-    visualize(Misspre)
+    #visualize(Misspre)
+    for i in range(0,24):
+        if(Misspre[hash2[i]][hash2[i]]>colorMax[hash2[i]]):
+            colorMax[hash2[i]]=Misspre[hash2[i]][hash2[i]]
+            if((Misspre[hash2[i]][hash2[i]]>85.00) and (precision>65)):
+                save_color_model(model,hash2[i])
 
 
 
