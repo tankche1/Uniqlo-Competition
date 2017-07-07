@@ -25,6 +25,7 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
 import torchvision
+import affine_transforms
 # from package.models import MyModel # you may import your own model in the package
 # from package import preprocess_methods # you may import your own preprocess method in the package
 
@@ -50,7 +51,7 @@ parser.add_argument('--automonous_stopping', type=int,default=0,
                     help='automonous_stopping')
 parser.add_argument('--data',default='data',metavar='NT',
                     help='the data directory')
-parser.add_argument('--modelpos',default='layer3.t7',metavar='NT',
+parser.add_argument('--modelpos',default='resnet18_pretrained.t7',metavar='NT',
                     help='the data directory')
 
 args=parser.parse_args()
@@ -77,15 +78,15 @@ print(colored('load model at '+args.modelpos,"blue"))
 
 #model = models.resnet18(pretrained=True)#at least 224*224
 model=torch.load(args.modelpos)
-#model.fc=nn.Linear(512,24)
+model.fc=nn.Linear(512,24)
 
 for param in model.parameters():
     param.requires_grads=False
 
 model.fc.requires_grads=True
-model.layer4.requires_grads=True
-model.layer3.requires_grads=True
-model.layer2.requires_grads=True
+#model.layer4.requires_grads=True
+#model.layer3.requires_grads=True
+#model.layer2.requires_grads=True
 
 if args.cuda:
     model.cuda()
@@ -106,41 +107,69 @@ traindir='data/train'
 valdir='data/val'
 #print(os.listdir(traindir))
 
+'''
+class Transpose(object):
+    def __init__(self,type=1):
+        self.type=type
+    def __call__(self,x):
+        x=x.numpy()
+        #print(x.shape,self.type)
+        if self.type==1:
+            return torch.from_numpy(x.transpose(1,2,0))
+        else:
+            return torch.from_numpy(x.transpose(2,0,1))
+'''
+
 train_loader1= torch.utils.data.DataLoader(
-                    datasets.ImageFolder(traindir, transforms.Compose([
-                        transforms.RandomSizedCrop(224),
-                        transforms.RandomHorizontalFlip(),
-                        transforms.ToTensor(),
-                        normalize,
-                    ])),
-                    batch_size=args.batchsize, shuffle=True,
-                    num_workers=4, pin_memory=True)
-
+                        datasets.ImageFolder(traindir, transforms.Compose([
+                            transforms.Scale(224),
+                            transforms.ToTensor(),
+                            affine_transforms.Affine(rotation_range=10,translation_range=[0.1,0.1],shear_range=0.1,zoom_range=[0.9,1.1]),
+                            normalize,
+                        ])),
+                        batch_size=args.batchsize, shuffle=True,
+                        num_workers=4, pin_memory=True)
 train_loader2= torch.utils.data.DataLoader(
-                    datasets.ImageFolder(traindir, transforms.Compose([
-                        transforms.Scale(224),
-                        #transforms.CenterCrop(224),
-                        transforms.ToTensor(),
-                        normalize,
-                    ])),
-                    batch_size=args.batchsize, shuffle=True,
-                    num_workers=4, pin_memory=True)
-
+                        datasets.ImageFolder(traindir, transforms.Compose([
+                            transforms.Scale(224),
+                            transforms.ToTensor(),
+                            affine_transforms.Affine(rotation_range=10,translation_range=[0.1,0.1],shear_range=0.1,zoom_range=[0.9,1.1]),
+                            normalize,
+                        ])),
+                        batch_size=args.batchsize, shuffle=True,
+                        num_workers=4, pin_memory=True)
 train_loader3= torch.utils.data.DataLoader(
-                    datasets.ImageFolder(traindir, transforms.Compose([
-                        transforms.RandomSizedCrop(224),
-                        transforms.RandomHorizontalFlip(),
-                        transforms.ToTensor(),
-                        normalize,
-                    ])),
-                    batch_size=args.batchsize, shuffle=True,
-                    num_workers=4, pin_memory=True)
-
+                        datasets.ImageFolder(traindir, transforms.Compose([
+                            transforms.Scale(224),
+                            transforms.ToTensor(),
+                            affine_transforms.Affine(rotation_range=10,translation_range=[0.1,0.1],shear_range=0.1,zoom_range=[0.9,1.1]),
+                            normalize,
+                        ])),
+                        batch_size=args.batchsize, shuffle=True,
+                        num_workers=4, pin_memory=True)
+train_loader4= torch.utils.data.DataLoader(
+                        datasets.ImageFolder(traindir, transforms.Compose([
+                            transforms.Scale(224),
+                            transforms.ToTensor(),
+                            affine_transforms.Affine(rotation_range=10,translation_range=[0.1,0.1],shear_range=0.1,zoom_range=[0.9,1.1]),
+                            normalize,
+                        ])),
+                        batch_size=args.batchsize, shuffle=True,
+                        num_workers=4, pin_memory=True)
+train_loader5= torch.utils.data.DataLoader(
+                        datasets.ImageFolder(traindir, transforms.Compose([
+                            transforms.Scale(224),
+                            transforms.ToTensor(),
+                            affine_transforms.Affine(rotation_range=10,translation_range=[0.1,0.1],shear_range=0.1,zoom_range=[0.9,1.1]),
+                            normalize,
+                        ])),
+                        batch_size=args.batchsize, shuffle=True,
+                        num_workers=4, pin_memory=True)
 
 val_loader = torch.utils.data.DataLoader(
         datasets.ImageFolder(valdir, transforms.Compose([
-            transforms.Scale(256),
-            transforms.CenterCrop(224),
+            transforms.Scale(224),
+            #transforms.CenterCrop(224),
             transforms.ToTensor(),
             normalize,
         ])),
@@ -186,37 +215,29 @@ def visualize(data):
     for i in range(0,24):
         print(colored('color %d precision: %.2f !' %(i,data[i][i]),'green'))
 
-
 def train(epoch):
-
-
+    
     model.train()
     print(colored('training epoch '+ str(epoch) + ' !','blue'))
 
     print(colored('loading data!','green'))
-    if epoch%3==0:
+    if epoch%5==0:
         train_loader=train_loader1
-    elif epoch%3==1:
-        train_loader=torch.utils.data.DataLoader(
-                    datasets.ImageFolder(traindir, transforms.Compose([
-                        transforms.Scale(224),
-                        #transforms.CenterCrop(224),
-                        transforms.ToTensor(),
-                        normalize,
-                    ])),
-                    batch_size=args.batchsize, shuffle=True,
-                    num_workers=4, pin_memory=True)
-    else:
+    elif epoch%5==1:
+        train_loader=train_loader2
+    elif epoch%5==2:
         train_loader=train_loader3
-
-
+    elif epoch%5==3:
+        train_loader=train_loader4
+    else:
+        train_loader=train_loader5
     print(colored('done!','green'))
     tot_loss=0.0
     num=0
     right=0
 
     for i, (inputs, targets) in tqdm(enumerate(train_loader)):
-
+        #print(inputs.size())
         if args.cuda:
             inputs=inputs.cuda(async=True)
             targets=targets.cuda(async=True)  
@@ -311,7 +332,7 @@ def test(epoch):
         for j in range(0,24):
             Misspre[hash2[i]][hash2[j]]=(100*Miss[hash2[i]][hash2[j]]*1.000)/(sum(Miss[hash2[i]])*1.000)
     #torch.save(Misspre,'visualize/visualize.t7')
-    visualize(Misspre)
+    #visualize(Misspre)
 
 
 
