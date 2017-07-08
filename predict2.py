@@ -26,7 +26,7 @@ import affine_transforms
 # from package import preprocess_methods # if you used some preprocess method in training phase, you may want to apply it in test phase.
 
 PATH_TO_TEST_IMAGES = os.path.join('data', 'test')
-PATH_TO_SUBMIT_FILE = 'submitfc.csv'
+PATH_TO_SUBMIT_FILE = 'submitthreshnet.csv'
 
 BatchSize=64
 
@@ -146,8 +146,8 @@ for i, (inputs, targets) in enumerate(test_loader):
 
 def load_trained_model():
     print('loading trained model ...')
-    print('fclayer_affine.t7!')
-    model = torch.load('fclayer_affine.t7')
+    print('threshnet2.t7!')
+    model = torch.load('threshnet2.t7')
     print(model)
     model.cuda()
     print('done.')
