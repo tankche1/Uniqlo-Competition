@@ -11,6 +11,7 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+import numpy
 from PIL import Image
 from collections import OrderedDict
 from tqdm import *
@@ -23,10 +24,11 @@ import torchvision.datasets as datasets
 import torchvision.models as models
 import torchvision
 import affine_transforms
+import skimage.feature as sk
 # from package import preprocess_methods # if you used some preprocess method in training phase, you may want to apply it in test phase.
 
 PATH_TO_TEST_IMAGES = os.path.join('data', 'test')
-PATH_TO_SUBMIT_FILE = 'submitweightresnet.csv'
+PATH_TO_SUBMIT_FILE = 'submitglcmnet.csv'
 
 BatchSize=64
 
@@ -146,12 +148,29 @@ for i, (inputs, targets) in enumerate(test_loader):
 
 def load_trained_model():
     print('loading trained model ...')
-    print('weightfc.t7!')
-    model = torch.load('weightfc.t7')
+    print('glcmnet.t7!')
+    model = torch.load('glcmnet.t7')
     print(model)
     model.cuda()
     print('done.')
     return model
+
+def rgb2gray(rgb):
+    r, g, b = rgb[:,:,0], rgb[:,:,1], rgb[:,:,2]
+    gray = 0.2989 * r + 0.5870 * g + 0.1140 * b
+    return gray
+
+def get_glcm(inputs):
+    #glcms=torch.FloatTensor(inputs.size())
+    glcms=numpy.arange(inputs.size(0)*4*256*256).reshape(inputs.size(0),4,256,256)
+    for i in range(0,inputs.size(0)):
+        gray=rgb2gray(inputs[i].numpy())
+        glcm = sk.greycomatrix(np.array(gray,dtype='uint8'), [1],[0, np.pi/4, np.pi/2, 3*np.pi/4]).transpose(2,3,0,1).reshape(4,256,256)
+        #print(glcm.dtype)
+        glcms[i,:,:,:]=(np.array(glcm,dtype='int32'))
+    #print(glcm.shape)
+    #print(glcms.shape)
+    return torch.from_numpy(glcms)
 
 def predict(model):
     print('predicting ...')
@@ -170,7 +189,7 @@ def predict(model):
     #Transpose2=Transpose(type=2)
     outputs=torch.zeros(9801,24).cuda()
 
-    for j in range(0,5):
+    for j in range(0,1):
 
         if j==0:
             test_loader=test_loader0
@@ -187,13 +206,14 @@ def predict(model):
 
         for i, (inputs, targets) in tqdm(enumerate(test_loader)):
             
+            gray_inputs=get_glcm(inputs).float().cuda()
             inputs=inputs.cuda()
             targets=targets.cuda()
-            inputs_var, targets_var = Variable(inputs), Variable(targets)
+            inputs_var, targets_var,gray_inputs_var = Variable(inputs), Variable(targets), Variable(gray_inputs)
 
             #print(inputs.size())
                 
-            output=model(inputs_var)
+            output=model(inputs_var,gray_inputs_var)
             outputs[num:num+inputs.size(0)] = outputs[num:num+inputs.size(0)]+output.data
                 
             #indices=indices.view(inputs.size(0))
@@ -223,6 +243,5 @@ if __name__ == '__main__':
     ## load the test data
 
     model = load_trained_model()
-    # 
     submit = predict(model)
     submit.to_csv(PATH_TO_SUBMIT_FILE, index=None, header=None)

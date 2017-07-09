@@ -40,13 +40,25 @@ def preprocess_image(path_to_images, path_to_dst_images):
     files = os.listdir(path_to_images)
     for f in files:
         im = Image.open(os.path.join(path_to_images, f))
-        
-        # you may write your own preprocess method here
-
-        #crop_size = (4,4,24,24)
+        box=(0,0,667,333)
+        region=im.crop(box)
         im = im.resize((64,64),Image.ANTIALIAS)
-        
-        im.save(os.path.join(path_to_dst_images, f))
+        im.save(os.path.join(path_to_dst_images, f+'u'))
+
+        box=(333,0,667,667)
+        region=im.crop(box)
+        im = im.resize((64,64),Image.ANTIALIAS)
+        im.save(os.path.join(path_to_dst_images, f+'d'))
+
+        box=(0,0,333,667)
+        region=im.crop(box)
+        im = im.resize((64,64),Image.ANTIALIAS)
+        im.save(os.path.join(path_to_dst_images, f+'l'))
+
+        box=(0,333,667,667)
+        region=im.crop(box)
+        im = im.resize((64,64),Image.ANTIALIAS)
+        im.save(os.path.join(path_to_dst_images, f+'r'))
     
     # if you want to process batch-wise, write the process here
 
