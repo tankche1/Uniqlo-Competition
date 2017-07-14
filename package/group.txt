@@ -1,0 +1,32 @@
+category_id catgory_name
+0   white
+1   off_white
+
+2   light_gray
+3   gray
+4   dark_gray
+5   black
+
+6   pink
+7   red
+8   wine
+
+9   orange
+10  dark_orange
+
+11  natural
+12  beige
+13  khaki
+14  brown
+15  dark_brown
+
+16  yellow
+
+17  light_green
+18  green
+19  olive
+20  dark_green
+
+21  blue
+22  navy
+23  purple
